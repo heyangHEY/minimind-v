@@ -136,6 +136,13 @@ git clone https://huggingface.co/jingyaogong/MiniMind2-V
 ```bash
 # load=0: load from pytorch model, load=1: load from transformers-hf model
 python eval_vlm.py --load 1
+
+# samll, VLM参数量：26.224 百万
+python eval_vlm.py --load 0 --out_dir ./out/MiniMind2-V-PyTorch --dim 512 --n_layers 8 --model_mode 1
+
+# VLM参数量：109.537 百万
+python eval_vlm.py --load 1 --model_mode 1
+python eval_vlm.py --load 0 --out_dir ./out/MiniMind2-V-PyTorch --dim 768 --n_layers 16 --model_mode 1
 ```
 
 ### 4.或启动WebUI
@@ -171,6 +178,10 @@ print(torch.cuda.is_available())
 下载需要的数据文件（创建`./dataset`目录）并放到`./dataset`下。
 
 `*.jsonl`为问答数据集，`*images`为配套的图片数据，下载完成后需要解压图像数据。
+
+```bash
+git clone https://huggingface.co/datasets/jingyaogong/minimind-v_dataset
+```
 
 <details style="color:rgb(128,128,128)">
 <summary>注：数据集须知</summary>

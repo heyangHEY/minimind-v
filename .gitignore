@@ -1,0 +1,5 @@
+wandb/
+out/
+model/
+MiniMind2-V/
+dataset/minimind-v_dataset/
