@@ -4,6 +4,9 @@ from typing import Optional, Tuple, List
 from torch import nn
 import warnings
 from transformers import CLIPProcessor, CLIPModel
+from transformers import ChineseCLIPProcessor, ChineseCLIPModel
+from transformers import SiglipProcessor, SiglipModel
+from transformers import AutoProcessor, AutoModel
 import torch
 
 warnings.filterwarnings('ignore')
@@ -31,13 +34,30 @@ class MiniMindVLM(MiniMindLM):
         super().__init__(params)
         if not params: params = VLMConfig()
         self.params = params
-        self.vision_encoder, self.processor = self.__class__.get_vision_model()
-        self.vision_proj = VisionProj(lm_dim=params.dim)
+        self.vision_model_name = params.vision_model_name
+        self.vision_encoder, self.processor = self.__class__.get_vision_model(
+            vision_model_name=params.vision_model_name
+        )
+        if self.vision_model_name == "siglip":
+            self.vision_proj = VisionProj(ve_dim=1152, lm_dim=params.dim)
+        else:
+            self.vision_proj = VisionProj(ve_dim=768, lm_dim=params.dim)
 
     @staticmethod
-    def get_vision_model(model_path="./model/vision_model/clip-vit-base-patch16"):
-        model = CLIPModel.from_pretrained(model_path)
-        processor = CLIPProcessor.from_pretrained(model_path)
+    def get_vision_model(vision_model_name="clip"):
+        if vision_model_name == "chinese-clip":
+            print("使用Chinese-CLIP模型")
+            model_path = "./model/vision_model/chinese-clip-vit-base-patch16"
+        elif vision_model_name == "clip":
+            print("使用CLIP模型")
+            model_path="./model/vision_model/clip-vit-base-patch16"
+        elif vision_model_name == "siglip":
+            print("使用SigLIP模型")
+            model_path = "./model/vision_model/siglip-so400m-patch14-224"
+        else:
+            raise ValueError(f"Unsupported model: {vision_model_name}")
+        model = AutoModel.from_pretrained(model_path)
+        processor = AutoProcessor.from_pretrained(model_path)
         # 冻结 vision_encoder 的所有参数
         for param in model.parameters():
             param.requires_grad = False
@@ -50,10 +70,15 @@ class MiniMindVLM(MiniMindLM):
         return inputs
 
     @staticmethod
-    def get_image_embeddings(image_tensors, vision_model):
+    def get_image_embeddings(image_tensors, vision_model, vision_model_name):
         with torch.no_grad():
             outputs = vision_model.vision_model(pixel_values=image_tensors)
-        img_embedding = outputs.last_hidden_state[:, 1:, :].squeeze()
+        if vision_model_name == "clip" or vision_model_name == "chinese-clip":
+            # ! 去掉CLS token，outputs.last_hidden_state.shape = torch.Size([1, 197, 768])
+            img_embedding = outputs.last_hidden_state[:, 1:, :].squeeze()
+        elif vision_model_name == "siglip":
+            # ! 没有CLS token，outputs.last_hidden_state.shape = torch.Size([1, 256, 1152])
+            img_embedding = outputs.last_hidden_state.squeeze()
         return img_embedding
 
     def count_vision_proj(self, tokens, h, vision_tensors=None, seqlen=512):
@@ -106,7 +131,7 @@ class MiniMindVLM(MiniMindLM):
             bs, num, c, im_h, im_w = pixel_tensors.shape
             stack_dim = 1 if bs > 1 else 0
             vision_tensors = torch.stack([
-                MiniMindVLM.get_image_embeddings(pixel_tensors[:, i, :, :, :], self.vision_encoder)
+                MiniMindVLM.get_image_embeddings(pixel_tensors[:, i, :, :, :], self.vision_encoder, self.vision_model_name)
                 for i in range(num)
             ], dim=stack_dim)
             h = self.count_vision_proj(tokens=input_ids, h=h, vision_tensors=vision_tensors, seqlen=input_ids.shape[1])
