@@ -120,7 +120,7 @@ def init_model(model_config: VLMConfig):
 
     Logger(f'VLM可训练参数量：{sum(p.numel() for p in model.parameters() if p.requires_grad) / 1e6:.3f} 百万')
 
-    _, preprocess = MiniMindVLM.get_vision_model(model_config.vision_model_name)
+    _, preprocess = MiniMindVLM.get_vision_model(model_config.vision_model_name, model_config.dtype, model_config.flash_attn)
     return model.to(args.device), tokenizer, preprocess
 
 
@@ -159,11 +159,11 @@ if __name__ == "__main__":
     parser.add_argument('--dim', default=512, type=int)
     parser.add_argument('--n_layers', default=8, type=int)
     parser.add_argument('--max_seq_len', default=640, type=int)
-    parser.add_argument('--use_moe', default=False, type=bool)
+    parser.add_argument('--use_moe', default=False, action="store_true")
     parser.add_argument('--vision_model_name', default="clip", type=str)
+    parser.add_argument('--flash_attn', default=False, action="store_true")
     args = parser.parse_args()
-
-    model_config = VLMConfig(dim=args.dim, n_layers=args.n_layers, max_seq_len=args.max_seq_len, vision_model_name=args.vision_model_name)
+    model_config = VLMConfig(dim=args.dim, n_layers=args.n_layers, max_seq_len=args.max_seq_len, vision_model_name=args.vision_model_name, flash_attn=args.flash_attn, dtype=args.dtype)
     max_seq_len = model_config.max_seq_len
     args.save_dir = os.path.join(args.out_dir)
     os.makedirs(args.save_dir, exist_ok=True)

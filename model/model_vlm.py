@@ -36,7 +36,9 @@ class MiniMindVLM(MiniMindLM):
         self.params = params
         self.vision_model_name = params.vision_model_name
         self.vision_encoder, self.processor = self.__class__.get_vision_model(
-            vision_model_name=params.vision_model_name
+            vision_model_name=params.vision_model_name,
+            dtype=params.dtype,
+            flash_attn=params.flash_attn
         )
         if self.vision_model_name == "siglip":
             self.vision_proj = VisionProj(ve_dim=1152, lm_dim=params.dim)
@@ -44,7 +46,7 @@ class MiniMindVLM(MiniMindLM):
             self.vision_proj = VisionProj(ve_dim=768, lm_dim=params.dim)
 
     @staticmethod
-    def get_vision_model(vision_model_name="clip"):
+    def get_vision_model(vision_model_name="clip", dtype="bfloat16", flash_attn=True):
         if vision_model_name == "chinese-clip":
             print("使用Chinese-CLIP模型")
             model_path = "./model/vision_model/chinese-clip-vit-base-patch16"
@@ -56,7 +58,19 @@ class MiniMindVLM(MiniMindLM):
             model_path = "./model/vision_model/siglip-so400m-patch14-224"
         else:
             raise ValueError(f"Unsupported model: {vision_model_name}")
-        model = AutoModel.from_pretrained(model_path)
+        
+        if dtype == "float16":
+            torch_dtype = torch.float16
+        elif dtype == "bfloat16":
+            torch_dtype = torch.bfloat16
+        else:
+            raise ValueError(f"Unsupported dtype: {dtype}")
+
+        model = AutoModel.from_pretrained(
+            model_path, 
+            attn_implementation="flash_attention_2" if flash_attn else "sdpa", # "sdpa"
+            torch_dtype=torch_dtype
+        )
         processor = AutoProcessor.from_pretrained(model_path)
         # 冻结 vision_encoder 的所有参数
         for param in model.parameters():

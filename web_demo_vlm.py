@@ -28,7 +28,7 @@ def init_model(lm_config):
 
     print(f'VLM参数量：{sum(p.numel() for p in model.parameters() if p.requires_grad) / 1e6:.3f} 百万')
 
-    vision_model, preprocess = MiniMindVLM.get_vision_model()
+    vision_model, preprocess = MiniMindVLM.get_vision_model(vision_model_name=lm_config.vision_model_name, dtype=lm_config.dtype, flash_attn=lm_config.flash_attn)
     return model.eval().to(args.device), tokenizer, vision_model.to(args.device), preprocess
 
 
@@ -166,11 +166,14 @@ if __name__ == '__main__':
     parser.add_argument('--dim', default=768, type=int)
     parser.add_argument('--n_layers', default=16, type=int)
     parser.add_argument('--max_seq_len', default=8192, type=int)
-    parser.add_argument('--use_moe', default=False, type=bool)
+    parser.add_argument('--use_moe', default=False, action="store_true")
     parser.add_argument('--stream', default=True, type=bool)
     parser.add_argument('--load', default=0, type=int, help="0: 原生torch权重，1: transformers加载")
+    parser.add_argument('--vision_model_name', default="clip", type=str)
+    parser.add_argument('--flash_attn', default=False, action="store_true")
+    parser.add_argument('--dtype', default='bfloat16', type=str)
     args = parser.parse_args()
 
-    lm_config = VLMConfig(dim=args.dim, n_layers=args.n_layers, max_seq_len=args.max_seq_len, use_moe=args.use_moe)
+    lm_config = VLMConfig(dim=args.dim, n_layers=args.n_layers, max_seq_len=args.max_seq_len, use_moe=args.use_moe, vision_model_name=args.vision_model_name, flash_attn=args.flash_attn, dtype=args.dtype)
     model, tokenizer, vision_model, preprocess = init_model(lm_config)
     launch_gradio_server(server_name="0.0.0.0", server_port=8888)

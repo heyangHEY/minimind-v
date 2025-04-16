@@ -35,7 +35,7 @@ def init_model(lm_config, device):
 
     print(f'VLM参数量：{sum(p.numel() for p in model.parameters() if p.requires_grad) / 1e6:.3f} 百万')
 
-    vision_model, preprocess = MiniMindVLM.get_vision_model()
+    vision_model, preprocess = MiniMindVLM.get_vision_model(vision_model_name=args.vision_model_name, dtype=args.dtype, flash_attn=args.flash_attn)
     return model.eval().to(device), tokenizer, vision_model.eval().to(device), preprocess
 
 
@@ -61,16 +61,20 @@ if __name__ == "__main__":
     parser.add_argument('--dim', default=512, type=int)
     parser.add_argument('--n_layers', default=8, type=int)
     parser.add_argument('--max_seq_len', default=8192, type=int)
-    parser.add_argument('--use_moe', default=False, type=bool)
+    parser.add_argument('--use_moe', default=False, action="store_true")
+    parser.add_argument('--dtype', default='bfloat16', type=str)
     # 默认单图推理，设置为2为多图推理
     parser.add_argument('--use_multi', default=1, type=int)
     parser.add_argument('--stream', default=True, type=bool)
     parser.add_argument('--load', default=0, type=int, help="0: 原生torch权重，1: transformers加载")
     parser.add_argument('--model_mode', default=1, type=int,
                         help="0: Pretrain模型，1: SFT模型，2: SFT-多图模型 (beta拓展)")
+    parser.add_argument('--vision_model_name', default='clip', type=str,
+                        help="clip: 使用CLIP模型，可选：clip, chinese-clip, siglip")
+    parser.add_argument('--flash_attn', default=False, action="store_true")
     args = parser.parse_args()
 
-    lm_config = VLMConfig(dim=args.dim, n_layers=args.n_layers, max_seq_len=args.max_seq_len, use_moe=args.use_moe)
+    lm_config = VLMConfig(dim=args.dim, n_layers=args.n_layers, max_seq_len=args.max_seq_len, use_moe=args.use_moe, vision_model_name=args.vision_model_name, flash_attn=args.flash_attn, dtype=args.dtype)
 
     model, tokenizer, vision_model, preprocess = init_model(lm_config, args.device)
 

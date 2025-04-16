@@ -106,12 +106,14 @@ class Attention(nn.Module):
         )
         if self.flash and seq_len != 1:
             dropout_p = self.dropout if self.training else 0.0
-            output = F.scaled_dot_product_attention(
-                xq, xk, xv,
-                attn_mask=None,
-                dropout_p=dropout_p,
-                is_causal=True
-            )
+            # 使用Flash Attention 2
+            with torch.backends.cuda.sdp_kernel(enable_flash=True, enable_math=False, enable_mem_efficient=False):
+                output = F.scaled_dot_product_attention(
+                    xq, xk, xv,
+                    attn_mask=None,
+                    dropout_p=dropout_p,
+                    is_causal=True
+                )
         else:
             scores = (xq @ xk.transpose(-2, -1)) / math.sqrt(self.head_dim)
             scores += self.mask[:, :, :seq_len, :seq_len]
